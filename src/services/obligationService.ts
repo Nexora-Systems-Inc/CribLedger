@@ -1,10 +1,10 @@
 // ============================================================
-// CribLedger — Obligation & Settlement Service
+// CribLedger — Obligation & Settlement Service (LIVE — Supabase)
 //
 // KEY DISTINCTION:
 //   Obligations  = debts created automatically by wager/match results
 //   Settlements  = payment events that reduce those debts
-//   Transactions = immutable ledger entries created when a settlement is confirmed
+//   Transactions = immutable ledger entries (written only by RPCs)
 // ============================================================
 
 import { supabase, TABLES, RPC } from '@/config/supabase';
@@ -13,162 +13,141 @@ import type { Obligation, Settlement } from '@/types';
 // ── OBLIGATIONS ───────────────────────────────────────────────
 
 export async function fetchObligations(): Promise<Obligation[]> {
-  // TODO: Supabase
-  // const { data, error } = await supabase
-  //   .from(TABLES.OBLIGATIONS)
-  //   .select('*')
-  //   .order('created_at', { ascending: false });
-  // if (error) throw error;
-  // return data;
-  const { MOCK_OBLIGATIONS } = await import('@/lib/mockData');
-  return [...MOCK_OBLIGATIONS];
+  const { data, error } = await supabase
+    .from(TABLES.OBLIGATIONS)
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data as Obligation[];
 }
 
 export async function fetchObligationsForUser(userId: string): Promise<Obligation[]> {
-  // TODO: Supabase
-  // const { data, error } = await supabase
-  //   .from(TABLES.OBLIGATIONS)
-  //   .select('*')
-  //   .or(`debtor_id.eq.${userId},creditor_id.eq.${userId}`)
-  //   .order('created_at', { ascending: false });
-  // if (error) throw error;
-  // return data;
-  const { MOCK_OBLIGATIONS } = await import('@/lib/mockData');
-  return MOCK_OBLIGATIONS.filter(o => o.debtor_id === userId || o.creditor_id === userId);
+  const { data, error } = await supabase
+    .from(TABLES.OBLIGATIONS)
+    .select('*')
+    .or(`debtor_id.eq.${userId},creditor_id.eq.${userId}`)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data as Obligation[];
 }
 
 export async function fetchOutstandingObligations(): Promise<Obligation[]> {
-  // TODO: Supabase
-  // const { data, error } = await supabase
-  //   .from(TABLES.OBLIGATIONS)
-  //   .select('*')
-  //   .in('status', ['outstanding', 'partially_paid'])
-  //   .order('created_at', { ascending: false });
-  // if (error) throw error;
-  // return data;
-  const { MOCK_OBLIGATIONS } = await import('@/lib/mockData');
-  return MOCK_OBLIGATIONS.filter(
-    o => o.status === 'outstanding' || o.status === 'partially_paid',
-  );
+  const { data, error } = await supabase
+    .from(TABLES.OBLIGATIONS)
+    .select('*')
+    .in('status', ['outstanding', 'partially_paid'])
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data as Obligation[];
 }
 
 /**
- * Fetch bilateral debt summary between two users.
- * In production this queries the bilateral_debt_summary materialized view.
- * Positive = userAId is owed money by userBId.
+ * Bilateral net between two users via the get_bilateral_balance RPC.
+ * Positive  → userAId is owed money by userBId.
+ * Negative  → userAId owes money to userBId.
  */
 export async function fetchBilateralDebt(
   userAId: string,
   userBId: string,
 ): Promise<number> {
-  // TODO: Supabase RPC
-  // const { data, error } = await supabase.rpc(RPC.GET_BILATERAL_BALANCE, {
-  //   user_a: userAId,
-  //   user_b: userBId,
-  // });
-  // if (error) throw error;
-  // return data as number;
-  const { MOCK_OBLIGATIONS, bilateralObligationNet } = await import('@/lib/mockData');
-  return bilateralObligationNet(userAId, userBId, MOCK_OBLIGATIONS);
+  const { data, error } = await supabase.rpc(RPC.GET_BILATERAL_BALANCE, {
+    user_a: userAId,
+    user_b: userBId,
+  });
+  if (error) throw new Error(error.message);
+  return (data as number) ?? 0;
 }
 
 // ── SETTLEMENTS ───────────────────────────────────────────────
 
 export async function fetchSettlements(): Promise<Settlement[]> {
-  // TODO: Supabase
-  // const { data, error } = await supabase
-  //   .from(TABLES.SETTLEMENTS)
-  //   .select('*')
-  //   .order('requested_at', { ascending: false });
-  // if (error) throw error;
-  // return data;
-  const { MOCK_SETTLEMENTS } = await import('@/lib/mockData');
-  return [...MOCK_SETTLEMENTS];
+  const { data, error } = await supabase
+    .from(TABLES.SETTLEMENTS)
+    .select('*')
+    .order('requested_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data as Settlement[];
 }
 
 export interface CreateSettlementInput {
-  debtor_id: string;
-  creditor_id: string;
-  amount: number;
-  obligation_ids: string[]; // which obligations this payment covers
-  notes?: string;
+  debtor_id:       string;
+  creditor_id:     string;
+  amount:          number;
+  obligation_ids:  string[];   // obligations this payment will cover
+  notes?:          string;
 }
 
 /**
- * Record that a payment is being requested/confirmed.
- *
- * This does NOT create a transaction — that happens in confirmSettlement.
- * Status starts as 'pending' (requested) or 'confirmed' depending on flow.
+ * Create a settlement record and link it to its obligations.
+ * Status starts as 'pending'. Call confirmSettlement() once money
+ * is confirmed received — that is what moves obligations to paid
+ * and writes the immutable ledger transaction.
  */
 export async function createSettlement(
   input: CreateSettlementInput,
   createdBy: string,
 ): Promise<Settlement> {
-  // TODO: Supabase
-  // const { data, error } = await supabase
-  //   .from(TABLES.SETTLEMENTS)
-  //   .insert({
-  //     debtor_id:   input.debtor_id,
-  //     creditor_id: input.creditor_id,
-  //     amount:      input.amount,
-  //     notes:       input.notes ?? null,
-  //     status:      'pending',
-  //     created_by:  createdBy,
-  //   })
-  //   .select()
-  //   .single();
-  // if (error) throw error;
-  //
-  // // Link to obligations
-  // const links = input.obligation_ids.map(obId => ({
-  //   settlement_id: data.id,
-  //   obligation_id: obId,
-  //   amount_applied: 0, // will be calculated on confirmation
-  // }));
-  // await supabase.from(TABLES.SETTLEMENT_OBLIGATIONS).insert(links);
-  //
-  // return data;
-  const s: Settlement = {
-    id: `st${Date.now()}`,
-    debtor_id:    input.debtor_id,
-    creditor_id:  input.creditor_id,
-    amount:       input.amount,
-    status:       'pending',
-    notes:        input.notes ?? null,
-    requested_at: new Date().toISOString(),
-    confirmed_at: null,
-    paid_at:      null,
-    created_by:   createdBy,
-  };
-  return s;
+  // 1. Insert settlement row
+  const { data, error } = await supabase
+    .from(TABLES.SETTLEMENTS)
+    .insert({
+      debtor_id:   input.debtor_id,
+      creditor_id: input.creditor_id,
+      amount:      input.amount,
+      notes:       input.notes ?? null,
+      status:      'pending',
+      created_by:  createdBy,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+
+  const settlement = data as Settlement;
+
+  // 2. Link to obligations via settlement_obligations join table.
+  //    Distribute the payment evenly across linked obligations;
+  //    the confirm_settlement RPC will apply exact amounts.
+  if (input.obligation_ids.length > 0) {
+    const amountPerOb = parseFloat(
+      (input.amount / input.obligation_ids.length).toFixed(2),
+    );
+    const links = input.obligation_ids.map(obId => ({
+      settlement_id:  settlement.id,
+      obligation_id:  obId,
+      amount_applied: amountPerOb,
+    }));
+    const { error: linkError } = await supabase
+      .from(TABLES.SETTLEMENT_OBLIGATIONS)
+      .insert(links);
+    if (linkError) throw new Error(linkError.message);
+  }
+
+  return settlement;
 }
 
 /**
- * Confirm that a payment was received.
+ * Confirm a payment was received.
  *
- * This is the operation that:
- * 1. Updates the settlement status → 'confirmed'
- * 2. Updates obligation amount_paid for each linked obligation
- * 3. Sets obligation status to 'paid' or 'partially_paid'
- * 4. Inserts a Transaction record (the immutable ledger entry)
- *
- * MUST run as an atomic Postgres RPC — not piecemeal from the client.
+ * Delegates to the confirm_settlement RPC (migration 006) which
+ * atomically:
+ *   1. Updates settlement status → 'confirmed'
+ *   2. Increments obligation.amount_paid for each linked obligation
+ *   3. Triggers obligation status update (outstanding → paid)
+ *   4. Inserts an immutable transaction record
+ *   5. Queues a notification for the debtor
+ *   6. Refreshes the user_balances materialized view (via trigger)
  */
 export async function confirmSettlement(settlementId: string): Promise<void> {
-  // TODO: Supabase RPC (atomic)
-  // const { error } = await supabase.rpc(RPC.CONFIRM_SETTLEMENT, {
-  //   p_settlement_id: settlementId,
-  // });
-  // if (error) throw error;
-  console.log('[mock] confirmSettlement', settlementId);
+  const { error } = await supabase.rpc(RPC.CONFIRM_SETTLEMENT, {
+    p_settlement_id: settlementId,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function markSettlementPaid(settlementId: string): Promise<void> {
-  // TODO: Supabase
-  // const { error } = await supabase
-  //   .from(TABLES.SETTLEMENTS)
-  //   .update({ status: 'paid', paid_at: new Date().toISOString() })
-  //   .eq('id', settlementId);
-  // if (error) throw error;
-  console.log('[mock] markSettlementPaid', settlementId);
+  const { error } = await supabase
+    .from(TABLES.SETTLEMENTS)
+    .update({ status: 'paid', paid_at: new Date().toISOString() })
+    .eq('id', settlementId);
+  if (error) throw new Error(error.message);
 }

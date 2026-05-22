@@ -1,7 +1,5 @@
 // ============================================================
-// CribLedger — Match Service
-// All Supabase interactions for matches.
-// Components never call Supabase directly — always through services.
+// CribLedger — Match Service (LIVE — Supabase)
 // ============================================================
 
 import { supabase, TABLES, RPC } from '@/config/supabase';
@@ -10,148 +8,121 @@ import type { Match, MatchWager } from '@/types';
 // ── READ ─────────────────────────────────────────────────────
 
 export async function fetchMatches(): Promise<Match[]> {
-  // TODO: Supabase
-  // const { data, error } = await supabase
-  //   .from(TABLES.MATCHES)
-  //   .select('*')
-  //   .order('created_at', { ascending: false });
-  // if (error) throw error;
-  // return data;
-  const { MOCK_MATCHES } = await import('@/lib/mockData');
-  return [...MOCK_MATCHES];
+  const { data, error } = await supabase
+    .from(TABLES.MATCHES)
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data as Match[];
 }
 
 export async function fetchMatchById(id: string): Promise<Match> {
-  // TODO: Supabase
-  // const { data, error } = await supabase
-  //   .from(TABLES.MATCHES)
-  //   .select('*')
-  //   .eq('id', id)
-  //   .single();
-  // if (error) throw error;
-  // return data;
-  const { MOCK_MATCHES } = await import('@/lib/mockData');
-  const m = MOCK_MATCHES.find(m => m.id === id);
-  if (!m) throw new Error(`Match ${id} not found`);
-  return m;
+  const { data, error } = await supabase
+    .from(TABLES.MATCHES)
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) throw new Error(error.message);
+  return data as Match;
 }
 
 export async function fetchMatchWagerForMatch(matchId: string): Promise<MatchWager | null> {
-  // TODO: Supabase
-  // const { data, error } = await supabase
-  //   .from(TABLES.MATCH_WAGERS)
-  //   .select('*')
-  //   .eq('match_id', matchId)
-  //   .maybeSingle();
-  // if (error) throw error;
-  // return data;
-  const { MOCK_MATCH_WAGERS } = await import('@/lib/mockData');
-  return MOCK_MATCH_WAGERS.find(w => w.match_id === matchId) ?? null;
+  const { data, error } = await supabase
+    .from(TABLES.MATCH_WAGERS)
+    .select('*')
+    .eq('match_id', matchId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data ?? null) as MatchWager | null;
 }
 
 // ── CREATE ────────────────────────────────────────────────────
 
 export interface CreateMatchInput {
-  player_a_id: string;
-  player_b_id: string;
-  point_wager: number;
+  player_a_id:  string;
+  player_b_id:  string;
+  point_wager:  number;
   winner_bonus: number;
-  notes?: string;
+  notes?:       string;
 }
 
 export async function createMatch(input: CreateMatchInput, createdBy: string): Promise<Match> {
-  // TODO: Supabase
-  // const { data, error } = await supabase
-  //   .from(TABLES.MATCHES)
-  //   .insert({
-  //     ...input,
-  //     status: 'pending',
-  //     created_by: createdBy,
-  //   })
-  //   .select()
-  //   .single();
-  // if (error) throw error;
-  //
-  // // Also create match_wager record immediately
-  // await supabase.from(TABLES.MATCH_WAGERS).insert({ match_id: data.id, status: 'active' });
-  //
-  // return data;
+  // Insert match row
+  const { data, error } = await supabase
+    .from(TABLES.MATCHES)
+    .insert({
+      player_a_id:  input.player_a_id,
+      player_b_id:  input.player_b_id,
+      point_wager:  input.point_wager,
+      winner_bonus: input.winner_bonus,
+      notes:        input.notes ?? null,
+      status:       'pending',
+      created_by:   createdBy,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
 
-  const newMatch: Match = {
-    id: `m${Date.now()}`,
-    ...input,
-    notes: input.notes ?? null,
-    status: 'pending',
-    winner_id: null,
-    player_a_score: null,
-    player_b_score: null,
-    created_by: createdBy,
-    created_at: new Date().toISOString(),
-    started_at: null,
-    completed_at: null,
-  };
-  return newMatch;
+  // Create the companion match_wager row immediately
+  const { error: mwError } = await supabase
+    .from(TABLES.MATCH_WAGERS)
+    .insert({ match_id: data.id, status: 'active' });
+  if (mwError) throw new Error(mwError.message);
+
+  return data as Match;
 }
 
 export async function startMatch(matchId: string): Promise<void> {
-  // TODO: Supabase
-  // const { error } = await supabase
-  //   .from(TABLES.MATCHES)
-  //   .update({ status: 'active', started_at: new Date().toISOString() })
-  //   .eq('id', matchId);
-  // if (error) throw error;
-  //
-  // // Activate any accepted external wagers on this match
-  // await supabase
-  //   .from(TABLES.EXTERNAL_WAGERS)
-  //   .update({ status: 'active', activated_at: new Date().toISOString() })
-  //   .eq('match_id', matchId)
-  //   .eq('status', 'accepted');
-  console.log('[mock] startMatch', matchId);
+  const { error } = await supabase
+    .from(TABLES.MATCHES)
+    .update({ status: 'active', started_at: new Date().toISOString() })
+    .eq('id', matchId);
+  if (error) throw new Error(error.message);
+
+  // Activate accepted side wagers for this match
+  const { error: wErr } = await supabase
+    .from(TABLES.EXTERNAL_WAGERS)
+    .update({ status: 'active', activated_at: new Date().toISOString() })
+    .eq('match_id', matchId)
+    .eq('status', 'accepted');
+  if (wErr) throw new Error(wErr.message);
 }
 
 // ── FINALIZE ──────────────────────────────────────────────────
 /**
- * Finalize a match with final scores.
+ * Finalize a match atomically via the finalize_match RPC.
  *
- * This is the most critical operation — it must be ATOMIC:
- * 1. Update match: scores, winner, status=completed, completed_at
- * 2. Update match_wager: debtor, creditor, amount, status=settled
- * 3. Insert obligation record (the DEBT — not payment)
- * 4. Settle all active external wagers on this match
- * 5. Insert obligation records for each external wager
- * 6. Insert notifications for all affected users
- *
- * All of the above runs inside a Postgres transaction via RPC.
- * NEVER do this piecemeal from the client.
+ * The RPC (migration 006) handles in a single transaction:
+ *   1. Updates match row (scores, winner, status=completed)
+ *   2. Updates match_wager (debtor, creditor, amount, status=settled)
+ *   3. Inserts obligation (debt record — NOT payment)
+ *   4. Settles all active side wagers → inserts obligations per wager
+ *   5. Inserts transaction records for the ledger
+ *   6. Queues notifications
+ *   7. Refreshes materialized views via triggers
  */
 export async function finalizeMatch(
-  matchId: string,
+  matchId:     string,
   playerAScore: number,
   playerBScore: number,
 ): Promise<void> {
-  // TODO: Supabase RPC — replaces all mock logic below
-  // const { error } = await supabase.rpc(RPC.FINALIZE_MATCH, {
-  //   p_match_id:      matchId,
-  //   p_score_a:       playerAScore,
-  //   p_score_b:       playerBScore,
-  // });
-  // if (error) throw error;
-
-  console.log('[mock] finalizeMatch', { matchId, playerAScore, playerBScore });
-  // Mock: handled optimistically in the store
+  const { error } = await supabase.rpc(RPC.FINALIZE_MATCH, {
+    p_match_id: matchId,
+    p_score_a:  playerAScore,
+    p_score_b:  playerBScore,
+  });
+  if (error) throw new Error(error.message);
 }
 
+/** Non-atomic live-score update — for in-game display only, not ledger. */
 export async function updateLiveScores(
-  matchId: string,
+  matchId:     string,
   playerAScore: number,
   playerBScore: number,
 ): Promise<void> {
-  // TODO: Supabase realtime update (non-atomic, for live display only)
-  // const { error } = await supabase
-  //   .from(TABLES.MATCHES)
-  //   .update({ player_a_score: playerAScore, player_b_score: playerBScore })
-  //   .eq('id', matchId);
-  // if (error) throw error;
-  console.log('[mock] updateLiveScores', { matchId, playerAScore, playerBScore });
+  const { error } = await supabase
+    .from(TABLES.MATCHES)
+    .update({ player_a_score: playerAScore, player_b_score: playerBScore })
+    .eq('id', matchId);
+  if (error) throw new Error(error.message);
 }
