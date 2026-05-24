@@ -28,8 +28,8 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
  * Then re-add the generic: createClient<Database>(...)
  */
 export const supabase = createClient(
-  SUPABASE_URL      ?? 'https://placeholder.supabase.co',
-  SUPABASE_ANON_KEY ?? 'placeholder',
+  SUPABASE_URL      ?? 'https://zwwglmdqldviiqotzyej.supabase.co/rest/v1/',
+  SUPABASE_ANON_KEY ?? 'sb_publishable_RpjFnqMcFgI6qlHkcepcvQ_bTEYxrMr',
 );
 
 // ── Table name constants ──────────────────────────────────────
