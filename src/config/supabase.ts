@@ -10,23 +10,15 @@ const SUPABASE_URL      = (import.meta as any).env?.VITE_SUPABASE_URL      as st
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn('[CribLedger] Supabase env vars not set — check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+  console.error(
+    '[CribLedger] Missing Supabase env vars.\n' +
+    'Create .env.local at PROJECT ROOT (next to vite.config.ts):\n' +
+    '  VITE_SUPABASE_URL=https://<ref>.supabase.co\n' +
+    '  VITE_SUPABASE_ANON_KEY=eyJ...  (anon/public JWT from Dashboard → Settings → API)\n\n' +
+    'NOTE: The key must start with "eyJ", NOT "sb_publishable_".'
+  );
 }
 
-/**
- * The Supabase client used throughout the service layer.
- *
- * We instantiate without a Database generic so TypeScript does not
- * constrain insert/update payloads to `never` while generated types
- * are unavailable. Runtime query correctness is guaranteed by the
- * real DB schema. To enable full compile-time column checking, run:
- *
- *   npx supabase gen types typescript \
- *     --project-id YOUR_PROJECT_ID \
- *     > src/config/database.types.ts
- *
- * Then re-add the generic: createClient<Database>(...)
- */
 export const supabase = createClient(
   SUPABASE_URL      ?? 'https://zwwglmdqldviiqotzyej.supabase.co',
   SUPABASE_ANON_KEY ?? 'sb_publishable_RpjFnqMcFgI6qlHkcepcvQ_bTEYxrMr',

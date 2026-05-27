@@ -24,7 +24,12 @@ export async function fetchUsers(): Promise<User[]> {
     .select('*')
     .eq('is_active', true)
     .order('display_name');
+
+  console.log('FETCH USERS DATA:', data);
+  console.log('FETCH USERS ERROR:', error);
+
   if (error) throw new Error(error.message);
+
   return data as User[];
 }
 
