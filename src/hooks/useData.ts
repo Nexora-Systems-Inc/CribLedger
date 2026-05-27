@@ -53,6 +53,16 @@ export function useUser(id: string) {
   return useQuery({ queryKey: QK.user(id), queryFn: () => userSvc.fetchUserById(id) });
 }
 
+/**
+ * Resolves the acting "current user" from the live users table.
+ * V1 no-auth pattern: returns the first admin user found.
+ * Replace with real auth context when auth is added.
+ */
+export function useCurrentUser(): User | undefined {
+  const { data: users } = useAllUsers();
+  return users?.find(u => u.role === 'admin') ?? users?.[0];
+}
+
 // ── Matches ───────────────────────────────────────────────────
 
 export function useMatches() {
@@ -68,6 +78,16 @@ export function useMatchWager(matchId: string) {
     queryKey: QK.matchWager(matchId),
     queryFn: () => matchSvc.fetchMatchWagerForMatch(matchId),
   });
+}
+
+/** Matches with status = 'pending' — not yet started. */
+export function usePendingMatches() {
+  const { data: matches, ...rest } = useMatches();
+  return {
+    data: (matches?.filter(m => m.status === 'pending') ?? [])
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    ...rest,
+  };
 }
 
 export function useActiveMatches() {
@@ -93,6 +113,23 @@ export function useCreateMatch() {
     mutationFn: ({ input, createdBy }: { input: matchSvc.CreateMatchInput; createdBy: string }) =>
       store.createMatch(input, createdBy),
     onSuccess: () => qc.invalidateQueries({ queryKey: QK.matches }),
+  });
+}
+
+/**
+ * Transition a pending match to active status.
+ * Also activates any accepted side wagers for this match.
+ */
+export function useStartMatch() {
+  const qc = useQueryClient();
+  const store = useMatchStore();
+  return useMutation({
+    mutationFn: (matchId: string) => store.startMatch(matchId),
+    onSuccess: (_data, matchId) => {
+      qc.invalidateQueries({ queryKey: QK.matches });
+      qc.invalidateQueries({ queryKey: QK.match(matchId) });
+      qc.invalidateQueries({ queryKey: QK.externalWagers });
+    },
   });
 }
 
@@ -257,7 +294,7 @@ export function useSetUserActive() {
       qc.invalidateQueries({ queryKey: QK.users });
       qc.invalidateQueries({ queryKey: ['allUsers'] });
       qc.invalidateQueries({ queryKey: QK.user(id) });
-      qc.invalidateQueries({ queryKey: QK.matches }); // active player list used in match creation
+      qc.invalidateQueries({ queryKey: QK.matches });
     },
   });
 }

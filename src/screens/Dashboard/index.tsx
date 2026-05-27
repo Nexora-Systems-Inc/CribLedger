@@ -7,24 +7,19 @@ import {
 } from '@/components/ui';
 import {
   useUserBalances, useUsers, useActiveMatches,
-  useCompletedMatches, useOutstandingObligations,
+  usePendingMatches, useCompletedMatches, useOutstandingObligations,
 } from '@/hooks/useData';
-import { PlusCircle, Clock, Trophy, Swords, Banknote, ChevronRight } from 'lucide-react';
-import { getUserById } from '@/lib/mockData';
+import { PlusCircle, Clock, Trophy, Swords, Banknote, ChevronRight, Timer } from 'lucide-react';
 import { formatCurrency, formatRelativeTime, obligationBalance } from '@/lib/calculations';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data: balances, isLoading: balLoading }   = useUserBalances();
-  const { data: users }                              = useUsers();
-  const { data: activeMatches }                      = useActiveMatches();
-  const { data: completedMatches }                   = useCompletedMatches();
-  const { data: outstanding }                        = useOutstandingObligations();
-
-  const totalMoved = completedMatches?.reduce((s, m) => {
-    const mw = null; // TODO: join match_wagers
-    return s;
-  }, 0) ?? 0;
+  const { data: users = [] }                         = useUsers();
+  const { data: activeMatches = [] }                 = useActiveMatches();
+  const { data: pendingMatches = [] }                = usePendingMatches();
+  const { data: completedMatches = [] }              = useCompletedMatches();
+  const { data: outstanding = [] }                   = useOutstandingObligations();
 
   return (
     <div className="animate-fade-in">
@@ -37,35 +32,74 @@ export default function Dashboard() {
         <SuitRow />
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      {/* Stats row — now 5 stats including Pending */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
         {[
-          { label: 'Players',      value: users?.length ?? 0,           icon: '♠' },
-          { label: 'Active',       value: activeMatches?.length ?? 0,   icon: '●', accent: (activeMatches?.length ?? 0) > 0 },
-          { label: 'Completed',    value: completedMatches?.length ?? 0, icon: '♣' },
-          { label: 'Unpaid Debts', value: outstanding?.length ?? 0,     icon: '♦', warn: (outstanding?.length ?? 0) > 0 },
-        ].map(({ label, value, icon, accent, warn }) => (
-          <Card key={label} className={accent ? 'animate-pulse-gold' : ''}>
+          { label: 'Players',   value: users.length,            icon: '♠' },
+          { label: 'Pending',   value: pendingMatches.length,   icon: '⏳', pending: pendingMatches.length > 0 },
+          { label: 'Active',    value: activeMatches.length,    icon: '●', accent: activeMatches.length > 0 },
+          { label: 'Completed', value: completedMatches.length, icon: '♣' },
+          { label: 'Wagers', value: 0, icon: '⚡' },
+          { label: 'Unpaid',    value: outstanding.length,      icon: '♦', warn: outstanding.length > 0 },
+        ].map(({ label, value, icon, accent, warn, pending }) => (
+          <Card
+            key={label}
+            className={accent ? 'animate-pulse-gold' : ''}
+            hover={pending || accent}
+            onClick={
+              pending ? () => navigate('/matches') :
+              accent  ? () => navigate('/matches') :
+              undefined
+            }
+          >
             <CardBody className="py-3">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className={`text-sm ${accent ? 'text-emerald-400' : warn ? 'text-crimson-400' : 'text-gold-400/50'}`}>{icon}</span>
+                <span className={`text-sm ${accent ? 'text-emerald-400' : warn ? 'text-crimson-400' : pending && value > 0 ? 'text-amber-400' : 'text-gold-400/50'}`}>
+                  {icon}
+                </span>
                 <span className="text-xs text-ivory-200/45 font-body uppercase tracking-wider">{label}</span>
               </div>
-              <p className={`text-2xl font-display font-bold ${warn && value > 0 ? 'text-crimson-400' : 'text-ivory-100'}`}>{value}</p>
+              <p className={`text-2xl font-display font-bold ${
+                warn    && value > 0 ? 'text-crimson-400' :
+                accent  && value > 0 ? 'text-emerald-400' :
+                pending && value > 0 ? 'text-amber-300'   :
+                'text-ivory-100'
+              }`}>{value}</p>
             </CardBody>
           </Card>
         ))}
       </div>
 
+      {/* ── Pending matches alert ── */}
+      {pendingMatches.length > 0 && (
+        <Card className="mb-4 cursor-pointer border border-amber-400/20 bg-amber-400/4"
+          onClick={() => navigate('/matches')}>
+          <CardBody className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Timer size={14} className="text-amber-400 shrink-0" />
+                <span className="text-sm font-body text-ivory-100">
+                  <span className="font-semibold text-amber-300">{pendingMatches.length} match{pendingMatches.length > 1 ? 'es' : ''}</span>
+                  <span className="text-ivory-200/55"> waiting to start</span>
+                </span>
+              </div>
+              <span className="text-xs text-amber-400/70 font-body flex items-center gap-1">
+                Lobby <ChevronRight size={12} />
+              </span>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
       {/* Active match alert */}
-      {(activeMatches?.length ?? 0) > 0 && (
-        <Card gold className="mb-5 cursor-pointer" onClick={() => navigate(`/matches/${activeMatches![0].id}`)}>
+      {activeMatches.length > 0 && (
+        <Card gold className="mb-5 cursor-pointer" onClick={() => navigate(`/matches/${activeMatches[0].id}`)}>
           <CardBody className="py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-sm font-body text-ivory-100">
-                  <span className="font-semibold">{activeMatches!.length} match{activeMatches!.length > 1 ? 'es' : ''}</span>
+                  <span className="font-semibold">{activeMatches.length} match{activeMatches.length > 1 ? 'es' : ''}</span>
                   <span className="text-ivory-200/55"> in progress</span>
                 </span>
               </div>
@@ -86,8 +120,10 @@ export default function Dashboard() {
           <CardBody className="py-2 px-2">
             {balLoading ? (
               <div className="py-6 flex justify-center"><div className="w-5 h-5 border-2 border-gold-400/20 border-t-gold-400 rounded-full animate-spin" /></div>
+            ) : (balances ?? []).length === 0 ? (
+              <EmptyState icon="♠" title="No balances yet" description="Complete a match to generate ledger entries" />
             ) : (balances ?? []).map((ub, i) => {
-              const user = users?.find(u => u.id === ub.user_id);
+              const user = users.find(u => u.id === ub.user_id);
               if (!user) return null;
               const rankIcons = ['♛', '2', '3'];
               return (
@@ -134,11 +170,11 @@ export default function Dashboard() {
               <p className="text-xs text-ivory-200/40 font-body mt-0.5">Obligations awaiting payment</p>
             </CardHeader>
             <CardBody className="pt-2 px-3 flex flex-col gap-2">
-              {(outstanding?.length ?? 0) === 0 ? (
+              {outstanding.length === 0 ? (
                 <EmptyState icon="♣" title="All clear" description="No outstanding debts" />
-              ) : outstanding!.slice(0, 4).map(ob => {
-                const debtor   = users?.find(u => u.id === ob.debtor_id);
-                const creditor = users?.find(u => u.id === ob.creditor_id);
+              ) : outstanding.slice(0, 4).map(ob => {
+                const debtor   = users.find(u => u.id === ob.debtor_id);
+                const creditor = users.find(u => u.id === ob.creditor_id);
                 const remaining = obligationBalance(ob);
                 return (
                   <div key={ob.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-felt-800/50 border border-felt-600/30">
@@ -155,9 +191,9 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-              {(outstanding?.length ?? 0) > 4 && (
+              {outstanding.length > 4 && (
                 <Button variant="ghost" size="sm" className="w-full justify-center" onClick={() => navigate('/settle')}>
-                  +{outstanding!.length - 4} more
+                  +{outstanding.length - 4} more
                 </Button>
               )}
             </CardBody>
